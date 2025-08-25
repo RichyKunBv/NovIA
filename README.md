@@ -2,6 +2,9 @@
 
 NovIA es un proyecto creativo que trae a la vida a Miku, una compañera IA con personalidad, directamente en tu terminal. Inspirada en la estética de herramientas como `neofetch`, esta aplicación combina una interfaz retro con un modelo de lenguaje moderno para crear una experiencia de chat única e interactiva.
 
+![Captura de pantalla de NovIA en acción](URL_DE_TU_CAPTURA_DE_PANTALLA_AQUÍ)
+*(Sugerencia: Sube una de tus capturas de pantalla al repositorio y reemplaza la URL de arriba)*
+
 ---
 
 ## ✨ Características Principales
@@ -23,3 +26,20 @@ NovIA es un proyecto creativo que trae a la vida a Miku, una compañera IA con p
 * **Modelo de Lenguaje:** Google Gemini 1.5 Flash
 * **Gestión de Entorno:** venv
 * **Manejo de API Keys:** python-dotenv
+
+---
+
+## 🚀 Configuración
+
+Para ejecutar este proyecto, necesitarás tener Python 3 instalado en tu sistema.
+
+1.  **Entorno Virtual:** Se recomienda encarecidamente crear y activar un entorno virtual de Python para manejar las dependencias del proyecto.
+
+2.  **Dependencias:** Instala las librerías necesarias que se encuentran listadas en el archivo `requirements.txt`.
+
+3.  **Clave de API:** Debes crear un archivo llamado `.env` en la raíz del proyecto. Dentro de este archivo, añade tu clave de la API de Google Gemini con el siguiente formato:
+    ```
+    GEMINI_API_KEY="AIzaSy...tu...clave...secreta...aqui"
+    ```
+
+Una vez configurado el entorno y las dependencias, el programa se ejecuta iniciando el script `main.py`.
