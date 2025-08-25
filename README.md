@@ -32,13 +32,16 @@ NovIA es un proyecto creativo que trae a la vida a Miku, una compañera IA con p
 
 Para ejecutar este proyecto, necesitarás tener Python 3 instalado en tu sistema.
 
-1.  **Entorno Virtual:** Se recomienda encarecidamente crear y activar un entorno virtual de Python para manejar las dependencias del proyecto.
+1.  **Entorno Virtual:** Se recomienda encarecidamente usar un entorno virtual de Python para instalar las dependencias de forma aislada y no afectar tu sistema.
 
-2.  **Dependencias:** Instala las librerías necesarias que se encuentran listadas en el archivo `requirements.txt`.
+2.  **Instalar Dependencias:** Este proyecto utiliza varias librerías de Python. Todas están listadas en el archivo `requirements.txt`. Para instalarlas todas de golpe, ejecuta el siguiente comando en tu terminal:
+    ```bash
+    python3 -m pip install -r requirements.txt
+    ```
 
 3.  **Clave de API:** Debes crear un archivo llamado `.env` en la raíz del proyecto. Dentro de este archivo, añade tu clave de la API de Google Gemini con el siguiente formato:
     ```
     GEMINI_API_KEY="AIzaSy...tu...clave...secreta...aqui"
     ```
 
-Una vez configurado el entorno y las dependencias, el programa se ejecuta iniciando el script `main.py`.
+Una vez configurado, el programa se ejecuta iniciando el script `main.py`.
