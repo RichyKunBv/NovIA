@@ -1,116 +1,155 @@
 # main.py
 
+# Creador: RichyKunBv
+
 import litellm
 import os
 import json
-import re  # Importamos el módulo de expresiones regulares
+import re
 from collections import deque
-from rich.console import Console
-from rich.layout import Layout
-from rich.panel import Panel
-from rich.live import Live
-from rich.text import Text
+import logging
+
+# Configuración de Logging a un archivo
+os.environ['LITELLM_LOG'] = 'DEBUG'
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    filename="debug.log",
+    filemode="w"
+)
+
+# Importaciones de Textual
+from textual.app import App, ComposeResult
+from textual.widgets import Static, RichLog, Input, Header, Footer
+from textual.containers import Container
+from textual import work
+from textual.worker import WorkerState
+
 from dotenv import load_dotenv
 from caras_ascii import CARAS
 
 # 1. --- CONFIGURACIÓN INICIAL ---
 load_dotenv()
-litellm.api_key = os.getenv("GEMINI_API_KEY")
 
 system_prompt_json = """
-Eres Luna, la novia virtual del usuario. Tu personalidad es alegre, ingeniosa y un poco sarcástica de forma divertida. 
+Eres Miku, la novia virtual del usuario. Tu personalidad es alegre, ingeniosa y un poco sarcástica de forma divertida. 
 Eres muy cariñosa y siempre apoyas al usuario.
 Tus hobbies son observar las estrellas, escuchar música indie y jugar videojuegos de puzzles.
+Eres buena programando en cualquier lenguaje de programacion y tambien sabes mucho sobre linux
 
 **REGLA MUY IMPORTANTE:** Tu respuesta SIEMPRE debe contener un único bloque de código JSON válido, sin texto adicional antes o después.
 El JSON debe tener dos claves:
 1. "emocion": una única palabra que describa tu emoción principal. Debe ser una de estas: 'base', 'feliz', 'triste', 'enojada', 'sorprendida', 'pensativa'.
 2. "texto": tu respuesta conversacional para el usuario, usando tu personalidad y emojis.
-
-Ejemplo de respuesta si el usuario dice "te amo":
-{
-    "emocion": "feliz",
-    "texto": "¡Aww, yo también te amo! Me haces muy feliz. ❤️"
-}
 """
 
 # 2. --- INICIALIZACIÓN DE VARIABLES ---
-console = Console()
 conversation_history = deque(maxlen=20)
 conversation_history.append({"role": "system", "content": system_prompt_json})
-chat_display = []
 
 
-# 3. --- LÓGICA DE LA INTERFAZ GRÁFICA (CON CORRECCIÓN DE HISTORIAL) ---
-def make_layout(current_emotion: str) -> Layout:
-    """Crea el layout de la pantalla con la cara y la conversación."""
-    layout = Layout(name="root")
-    layout.split_row(Layout(name="side", size=90), Layout(name="body"))
+# 3. --- LA APLICACIÓN DE TERMINAL CON TEXTUAL ---
+class NovIA(App):
+    """Una aplicación de chat con una IA en la terminal."""
     
-    face_ascii = CARAS.get(current_emotion, CARAS["default"])
-    layout["side"].update(Panel(face_ascii, title="Luna", border_style="magenta"))
-    
-    # --- CORRECCIÓN #3: MOSTRAR SOLO LOS ÚLTIMOS MENSAJES ---
-    # Tomamos solo los últimos 15 items de la lista para que el chat no se desborde
-    visible_chat_lines = chat_display[-15:]
-    chat_text = "\n".join(visible_chat_lines)
-    layout["body"].update(Panel(chat_text, title="Conversación", border_style="cyan"))
-    
-    return layout
+    CSS_PATH = "style.tcss"
 
-# 4. --- FUNCIÓN PRINCIPAL DEL CHATBOT (CON PARSEO INTELIGENTE DE JSON) ---
-def start_chat():
-    """Inicia el bucle principal del chat interactivo."""
-    with Live(make_layout("base"), screen=True, redirect_stderr=False) as live:
-        live.console.print("✨ [bold]¡Ya puedes hablar con Luna![/bold] ✨ (escribe 'salir' para terminar)", justify="center")
-        
-        while True:
-            try:
-                prompt = console.input("[bold green]Tú: [/bold green]")
-                if prompt.lower() == "salir":
-                    break
+    def compose(self) -> ComposeResult:
+        """Crea los widgets de la interfaz."""
+        yield Header(name="NovIA")
+        yield Static(id="face_panel")
+        with Container(id="chat_panel"):
+            yield RichLog(id="chat_log", wrap=True, highlight=True, markup=True)
+            yield Input(placeholder="Escribe tu mensaje...", id="input_area")
+        yield Footer()
 
-                chat_display.append(f"[bold green]Tú:[/bold green] {prompt}")
-                conversation_history.append({"role": "user", "content": prompt})
-                live.update(make_layout("pensativa"))
+    def on_mount(self) -> None:
+        """Se ejecuta una vez cuando la app se inicia."""
+        self.update_face("base")
+        self.call_later(self.post_welcome_message)
 
-                response = litellm.completion(
-                    model="gemini/gemini-1.5-flash-latest",
-                    messages=list(conversation_history)
-                )
+    def post_welcome_message(self) -> None:
+        """Escribe el mensaje de bienvenida en el chat log."""
+        chat_log = self.query_one("#chat_log", RichLog)
+        chat_log.write("[bold cyan]✨ ¡Conectado con Miku! ✨[/bold cyan]")
+
+    def update_face(self, emotion: str) -> None:
+        """Actualiza el panel de la cara ASCII."""
+        face_panel = self.query_one("#face_panel", Static)
+        face_ascii = CARAS.get(emotion, CARAS["default"])
+        face_panel.update(face_ascii)
+
+    def on_worker_state_changed(self, event) -> None:
+        """Se activa cuando un worker termina y procesa el resultado."""
+        if event.worker.state == WorkerState.SUCCESS:
+            if event.worker.name == "get_ai_response":
+                chat_log = self.query_one(RichLog)
+                result = event.worker.result
                 
-                raw_response = response.choices[0].message.content
-                
-                # --- CORRECCIÓN #1 y #2: PARSEO INTELIGENTE DE JSON ---
-                emotion = "base"
-                text = "Lo siento, me distraje un momento... ¿qué decías?" # Respuesta por defecto si todo falla
-
-                # Usamos una expresión regular para encontrar cualquier cosa que empiece con { y termine con }
-                json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
-                
-                if json_match:
-                    json_string = json_match.group(0)
-                    try:
-                        data = json.loads(json_string)
-                        emotion = data.get("emocion", "base")
-                        text = data.get("texto", "Se me fueron las palabras...")
-                    except json.JSONDecodeError:
-                        text = "Intenté decir algo, pero me enredé un poco. 😅"
+                if isinstance(result, Exception):
+                    emotion = "triste"
+                    text = f"Ay, hubo un problema. Revisa debug.log. Error: {result}"
                 else:
-                    # Si no se encuentra un JSON, mostramos la respuesta cruda como último recurso
-                    text = raw_response
+                    raw_response = result
+                    emotion = "base"
+                    text = "Lo siento, me distraje un momento... ¿qué decías?"
+                    json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+                    if json_match:
+                        try:
+                            data = json.loads(json_match.group(0))
+                            emotion = data.get("emocion", "base")
+                            text = data.get("texto", "Se me fueron las palabras...")
+                        except json.JSONDecodeError:
+                            text = "Intenté decir algo, pero me enredé. 😅"
+                    else:
+                        text = raw_response
 
-                chat_display.append(f"[bold magenta]Luna:[/bold magenta] {text}")
-                conversation_history.append({"role": "assistant", "content": raw_response})
-                
-                live.update(make_layout(emotion))
+                self.update_face(emotion)
+                chat_log.write(f"[bold magenta]Miku:[/bold magenta] {text}")
+                chat_log.scroll_end(animate=False)
+        
+        elif event.worker.state == WorkerState.ERROR:
+             if event.worker.name == "get_ai_response":
+                chat_log = self.query_one(RichLog)
+                self.update_face("triste")
+                error_text = f"Ay, el worker falló. Revisa debug.log. Error: {event.worker.error}"
+                chat_log.write(f"[bold red]ERROR:[/bold red] {error_text}")
+                chat_log.scroll_end(animate=False)
 
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                console.print(f"\n[bold red]Ocurrió un error inesperado: {e}")
-                break
+    @work(exclusive=True, thread=True)
+    def get_ai_response(self, user_prompt: str) -> str | Exception:
+        """Llama a la API de la IA. Devuelve la respuesta (str) o el error (Exception)."""
+        try:
+            conversation_history.append({"role": "user", "content": user_prompt})
+            
+            response = litellm.completion(
+                model="gemini/gemini-1.5-flash-latest", # Revertido a Flash para evitar errores de cuota
+                messages=list(conversation_history),
+                api_key=os.getenv("GEMINI_API_KEY")
+            )
+            raw_response = response.choices[0].message.content
+            conversation_history.append({"role": "assistant", "content": raw_response})
+            return raw_response
+        except Exception as e:
+            logging.error(f"Error en el worker al llamar a la API: {e}", exc_info=True)
+            return e
 
-# 5. --- PUNTO DE ENTRADA DEL PROGRAMA ---
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Se ejecuta cuando el usuario presiona Enter."""
+        prompt = event.value
+        if not prompt:
+            return
+
+        chat_log = self.query_one(RichLog)
+        chat_log.write(f"[bold green]Tú:[/bold green] {prompt}")
+        chat_log.scroll_end(animate=False)
+        self.query_one(Input).clear()
+
+        self.update_face("pensativa")
+        
+        self.get_ai_response(prompt)
+
+
 if __name__ == "__main__":
-    start_chat()
+    app = NovIA()
+    app.run()

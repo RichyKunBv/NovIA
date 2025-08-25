@@ -1,5 +1,7 @@
 # caras_ascii.py
 
+# Creador: RichyKunBv
+
 from rich.text import Text
 
 CARAS = {
