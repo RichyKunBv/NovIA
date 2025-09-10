@@ -45,3 +45,25 @@ Para ejecutar este proyecto, necesitarás tener Python 3 instalado en tu sistema
     ```
 
 Una vez configurado, el programa se ejecuta iniciando el script `main.py`.
+
+
+---
+
+
+## 👻 Instrucciones para otras versiones
+<details>
+<summary>Haz clic aquí para ver las instrucciones NovIA_Con_Ollama</summary>
+
+### 1. Lo primero que tienes que hacer es Descargar e Instalar OLLAMA
+
+### 2. Despues en la terminal escribe este comando: 
+    
+    ollama run phi3:mini
+
+### 3.  **Instalar Dependencias:** Este proyecto utiliza varias librerías de Python. Todas están listadas en el archivo `requirements.txt`. Para instalarlas todas de golpe, ejecuta el siguiente comando en tu terminal:
+    python3 -m pip install -r requirements.txt
+     
+</details>
+
+</details>
+
