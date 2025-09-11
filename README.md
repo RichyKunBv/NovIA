@@ -58,10 +58,16 @@ Una vez configurado, el programa se ejecuta iniciando el script `main.py`.
 
 ### 2. Despues en la terminal escribe este comando: 
     
-    ollama run phi3:mini
+    ollama run llama3.1:8b
 
 ### 3.  **Instalar Dependencias:** Este proyecto utiliza varias librerías de Python. Todas están listadas en el archivo `requirements.txt`. Para instalarlas todas de golpe, ejecuta el siguiente comando en tu terminal:
     python3 -m pip install -r requirements.txt
+
+### 4. Configura la memoria: entra al archivo "memoria.json" y escribe tu nombre y algunos detalles
+
+Una vez configurado, el programa se ejecuta iniciando el script `main.py`.
+
+    
 
 <img width="1440" height="900" alt="Captura de pantalla 2025-09-09 a la(s) 11 56 48 p m" src="https://github.com/user-attachments/assets/4ce64384-a7a7-47d1-b0e7-92981fdc9325" />
 
