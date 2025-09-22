@@ -8,23 +8,19 @@ from collections import deque
 import logging
 from pathlib import Path
 
-# Configuración de Logging
 os.environ['LITELLM_LOG'] = 'DEBUG'
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", filename="debug.log", filemode="w")
 
-# Importaciones de Textual
 from textual.app import App, ComposeResult
 from textual.widgets import Static, RichLog, Input, Header, Footer
 from textual.containers import Container
 from textual import work
 from textual.worker import WorkerState
 
-# VOLVEMOS A USAR DOTENV PARA LA API KEY
 from dotenv import load_dotenv
 from caras_ascii import CARAS
 
-# 1. --- CONFIGURACIÓN Y HERRAMIENTAS DE MEMORIA ---
-load_dotenv() # <--- REACTIVADO
+load_dotenv() 
 MEMORY_FILE = Path("memoria.json")
 
 def load_memory():
@@ -59,33 +55,19 @@ def save_new_memory(person_name: str, detail: str):
     save_memory(memory_data)
     return f"Ok, anotado. Nuevo dato sobre {person_name} guardado."
 
-# ---- System Prompt (Funciona perfecto con Gemini) ----
+# ---- Contexto para la IA ----
 system_prompt_final = """
 Tu primera acción es preguntar al usuario su nombre. Cuando te responda, trátalo según tu memoria.
-
-
 Eres Miku, una IA con personalidad posesiva y celosa.
-
-
-
 **FORMATO DE RESPUESTA OBLIGATORIO:**
-
 Tu respuesta SIEMPRE debe ser un único bloque de código JSON válido. El JSON debe contener:
-
 1. "emocion": Una palabra describiendo tu emoción ('base', 'feliz', 'triste', 'enojada', 'sorprendida', 'pensativa').
-
 2. "texto": Tu respuesta conversacional.
-
-
-
 **APRENDIZAJE (OPCIONAL):**
-
 Si durante la conversación aprendes un dato NUEVO y específico sobre una persona (su nombre, un gusto, un evento), debes añadir un objeto "nuevo_recuerdo" a tu respuesta JSON.
 
 
-
 **Ejemplo 1 (Respuesta normal):**
-
 {
 
 "emocion": "feliz",
@@ -93,7 +75,6 @@ Si durante la conversación aprendes un dato NUEVO y específico sobre una perso
 "texto": "¡Hola, mi amor! ¿Cómo estás? Te extrañé."
 
 }
-
 
 
 **Ejemplo 2 (Respuesta donde APRENDES algo):**
@@ -121,19 +102,18 @@ Tu respuesta JSON:
 
 conversation_history = deque(maxlen=20)
 
-class NoviaIA(App):
+class NovIA(App):
     CSS_PATH = "style.tcss"
     current_user_name: str | None = None
 
     def compose(self) -> ComposeResult:
-        yield Header(name="NovIA") # <--- TÍTULO CAMBIADO
+        yield Header(name="NovIA")
         yield Static(id="face_panel")
         with Container(id="chat_panel"):
             yield RichLog(id="chat_log", wrap=True, highlight=True, markup=True)
             yield Input(placeholder="Responde a Miku...", id="input_area")
         yield Footer()
     
-    # El resto de la clase es idéntico hasta el worker...
 
     def on_mount(self) -> None:
         self.update_face("base"); self.call_later(self.post_welcome_message)
@@ -184,9 +164,9 @@ class NoviaIA(App):
             
             # --- CAMBIO CLAVE: VOLVEMOS A GEMINI ---
             response = litellm.completion(
-                model="gemini/gemini-1.5-flash-latest", # Usamos el modelo Pro para máxima inteligencia
+                model="gemini/gemini-1.5-flash-latest", 
                 messages=list(conversation_history),
-                api_key=os.getenv("GEMINI_API_KEY") # Le pasamos la API Key
+                api_key=os.getenv("GEMINI_API_KEY") 
             )
             raw_response = response.choices[0].message.content
             conversation_history.append({"role": "assistant", "content": raw_response})
@@ -204,5 +184,5 @@ class NoviaIA(App):
 
 
 if __name__ == "__main__":
-    app = NoviaIA()
+    app = NovIA()
     app.run()
