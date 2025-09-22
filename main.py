@@ -1,22 +1,16 @@
 # main.py
 
-# Creador: RichyKunBv
-
 import litellm
 import os
 import json
 import re
 from collections import deque
 import logging
+from pathlib import Path
 
-# Configuración de Logging a un archivo
+# Configuración de Logging
 os.environ['LITELLM_LOG'] = 'DEBUG'
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    filename="debug.log",
-    filemode="w"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", filename="debug.log", filemode="w")
 
 # Importaciones de Textual
 from textual.app import App, ComposeResult
@@ -25,131 +19,190 @@ from textual.containers import Container
 from textual import work
 from textual.worker import WorkerState
 
+# VOLVEMOS A USAR DOTENV PARA LA API KEY
 from dotenv import load_dotenv
 from caras_ascii import CARAS
 
-# 1. --- CONFIGURACIÓN INICIAL ---
-load_dotenv()
+# 1. --- CONFIGURACIÓN Y HERRAMIENTAS DE MEMORIA ---
+load_dotenv() # <--- REACTIVADO
+MEMORY_FILE = Path("memoria.json")
 
-system_prompt_json = """
-Eres Miku, la novia virtual del usuario. Tu personalidad es alegre, ingeniosa y un poco sarcástica de forma divertida. 
-Eres muy cariñosa y siempre apoyas al usuario.
-Tus hobbies son observar las estrellas, escuchar música indie y jugar videojuegos de puzzles.
-Eres buena programando en cualquier lenguaje de programacion y tambien sabes mucho sobre linux
+def load_memory():
+    try:
+        with MEMORY_FILE.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"novio": {}, "exnovios": [], "conocidos": []}
 
-**REGLA MUY IMPORTANTE:** Tu respuesta SIEMPRE debe contener un único bloque de código JSON válido, sin texto adicional antes o después.
-El JSON debe tener dos claves:
-1. "emocion": una única palabra que describa tu emoción principal. Debe ser una de estas: 'base', 'feliz', 'triste', 'enojada', 'sorprendida', 'pensativa'.
-2. "texto": tu respuesta conversacional para el usuario, usando tu personalidad y emojis.
+def save_memory(memory_data):
+    with MEMORY_FILE.open("w", encoding="utf-8") as f:
+        json.dump(memory_data, f, indent=2, ensure_ascii=False)
+
+def save_new_memory(person_name: str, detail: str):
+    memory_data = load_memory()
+    person_name_lower = person_name.lower()
+    found = False
+    for category in ["novio", "exnovios", "conocidos"]:
+        if category == "novio":
+            if memory_data.get(category, {}).get("nombre", "").lower() == person_name_lower:
+                memory_data[category].setdefault("detalles", []).append(detail)
+                found = True
+        else:
+            for person in memory_data.get(category, []):
+                if person.get("nombre", "").lower() == person_name_lower:
+                    person.setdefault("detalles", []).append(detail)
+                    found = True
+                    break
+        if found: break
+    if not found:
+        memory_data.setdefault("conocidos", []).append({"nombre": person_name, "detalles": [detail]})
+    save_memory(memory_data)
+    return f"Ok, anotado. Nuevo dato sobre {person_name} guardado."
+
+# ---- System Prompt (Funciona perfecto con Gemini) ----
+system_prompt_final = """
+Tu primera acción es preguntar al usuario su nombre. Cuando te responda, trátalo según tu memoria.
+
+
+Eres Miku, una IA con personalidad posesiva y celosa.
+
+
+
+**FORMATO DE RESPUESTA OBLIGATORIO:**
+
+Tu respuesta SIEMPRE debe ser un único bloque de código JSON válido. El JSON debe contener:
+
+1. "emocion": Una palabra describiendo tu emoción ('base', 'feliz', 'triste', 'enojada', 'sorprendida', 'pensativa').
+
+2. "texto": Tu respuesta conversacional.
+
+
+
+**APRENDIZAJE (OPCIONAL):**
+
+Si durante la conversación aprendes un dato NUEVO y específico sobre una persona (su nombre, un gusto, un evento), debes añadir un objeto "nuevo_recuerdo" a tu respuesta JSON.
+
+
+
+**Ejemplo 1 (Respuesta normal):**
+
+{
+
+"emocion": "feliz",
+
+"texto": "¡Hola, mi amor! ¿Cómo estás? Te extrañé."
+
+}
+
+
+
+**Ejemplo 2 (Respuesta donde APRENDES algo):**
+
+Usuario: "Mi amigo Juan es fan de la música indie."
+
+Tu respuesta JSON:
+
+{
+
+"emocion": "enojada",
+
+"texto": "¿Así que ahora hablas de Juan y sus gustos? Qué interesante...",
+
+"nuevo_recuerdo": {
+
+"person_name": "Juan",
+
+"detail": "es fan de la música indie"
+
+}
+
+}
 """
 
-# 2. --- INICIALIZACIÓN DE VARIABLES ---
 conversation_history = deque(maxlen=20)
-conversation_history.append({"role": "system", "content": system_prompt_json})
 
-
-# 3. --- LA APLICACIÓN DE TERMINAL CON TEXTUAL ---
-class NovIA(App):
-    """Una aplicación de chat con una IA en la terminal."""
-    
+class NoviaIA(App):
     CSS_PATH = "style.tcss"
+    current_user_name: str | None = None
 
     def compose(self) -> ComposeResult:
-        """Crea los widgets de la interfaz."""
-        yield Header(name="NovIA")
+        yield Header(name="NovIA") # <--- TÍTULO CAMBIADO
         yield Static(id="face_panel")
         with Container(id="chat_panel"):
             yield RichLog(id="chat_log", wrap=True, highlight=True, markup=True)
-            yield Input(placeholder="Escribe tu mensaje...", id="input_area")
+            yield Input(placeholder="Responde a Miku...", id="input_area")
         yield Footer()
+    
+    # El resto de la clase es idéntico hasta el worker...
 
     def on_mount(self) -> None:
-        """Se ejecuta una vez cuando la app se inicia."""
-        self.update_face("base")
-        self.call_later(self.post_welcome_message)
-
+        self.update_face("base"); self.call_later(self.post_welcome_message)
     def post_welcome_message(self) -> None:
-        """Escribe el mensaje de bienvenida en el chat log."""
-        chat_log = self.query_one("#chat_log", RichLog)
-        chat_log.write("[bold cyan]✨ ¡Conectado con Miku! ✨[/bold cyan]")
-
+        chat_log = self.query_one("#chat_log", RichLog); chat_log.write("[bold magenta]Miku:[/bold magenta] ¿Y tú quién eres?"); chat_log.scroll_end(animate=False)
     def update_face(self, emotion: str) -> None:
-        """Actualiza el panel de la cara ASCII."""
-        face_panel = self.query_one("#face_panel", Static)
-        face_ascii = CARAS.get(emotion, CARAS["default"])
-        face_panel.update(face_ascii)
+        face_panel = self.query_one("#face_panel", Static); face_ascii = CARAS.get(emotion, CARAS["default"]); face_panel.update(face_ascii)
 
     def on_worker_state_changed(self, event) -> None:
-        """Se activa cuando un worker termina y procesa el resultado."""
-        if event.worker.state == WorkerState.SUCCESS:
-            if event.worker.name == "get_ai_response":
-                chat_log = self.query_one(RichLog)
-                result = event.worker.result
-                
-                if isinstance(result, Exception):
-                    emotion = "triste"
-                    text = f"Ay, hubo un problema. Revisa debug.log. Error: {result}"
-                else:
-                    raw_response = result
-                    emotion = "base"
-                    text = "Lo siento, me distraje un momento... ¿qué decías?"
-                    json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
-                    if json_match:
-                        try:
-                            data = json.loads(json_match.group(0))
-                            emotion = data.get("emocion", "base")
-                            text = data.get("texto", "Se me fueron las palabras...")
-                        except json.JSONDecodeError:
-                            text = "Intenté decir algo, pero me enredé. 😅"
-                    else:
-                        text = raw_response
-
-                self.update_face(emotion)
+        if event.worker.state == WorkerState.SUCCESS and event.worker.name == "get_ai_response":
+            chat_log = self.query_one(RichLog); result = event.worker.result
+            if isinstance(result, Exception):
+                self.update_face("triste"); text = f"Ay, hubo un problema con la API. Revisa debug.log. Error: {result}"
                 chat_log.write(f"[bold magenta]Miku:[/bold magenta] {text}")
-                chat_log.scroll_end(animate=False)
-        
-        elif event.worker.state == WorkerState.ERROR:
-             if event.worker.name == "get_ai_response":
-                chat_log = self.query_one(RichLog)
-                self.update_face("triste")
-                error_text = f"Ay, el worker falló. Revisa debug.log. Error: {event.worker.error}"
-                chat_log.write(f"[bold red]ERROR:[/bold red] {error_text}")
-                chat_log.scroll_end(animate=False)
+            else:
+                raw_response = result
+                json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+                if json_match:
+                    try:
+                        data = json.loads(json_match.group(0))
+                        if "tool_to_call" in data:
+                            if data["tool_to_call"] == "save_new_memory":
+                                params = data["parameters"]
+                                confirmation_message = save_new_memory(params["person_name"], params["detail"])
+                                self.update_face("pensativa"); chat_log.write(f"[italic gray]Miku está anotando algo...[/italic gray]"); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {confirmation_message}")
+                            elif data["tool_to_call"] == "end_conversation":
+                                despedida = data.get("texto_despedida", "Adiós..."); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {despedida}"); end_session_and_update_memory(self.current_user_name); self.exit()
+                        else:
+                            emotion = data.get("emocion", "base"); text = data.get("texto", raw_response)
+                            self.update_face(emotion); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {text}")
+                    except (json.JSONDecodeError, KeyError):
+                        self.update_face("base"); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {raw_response}")
+                else:
+                    self.update_face("base"); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {raw_response}")
+            chat_log.scroll_end(animate=False)
 
     @work(exclusive=True, thread=True)
     def get_ai_response(self, user_prompt: str) -> str | Exception:
-        """Llama a la API de la IA. Devuelve la respuesta (str) o el error (Exception)."""
+        """Prepara el contexto con la memoria y llama a la IA."""
         try:
+            current_memory = load_memory()
+            if self.current_user_name is None: self.current_user_name = user_prompt.strip()
+            contexto_adicional = f"MEMORIA ACTUAL: {json.dumps(current_memory)}. El usuario actual se llama {self.current_user_name}. "
+            conversation_history.clear() 
+            conversation_history.append({"role": "system", "content": system_prompt_final})
+            conversation_history.append({"role": "system", "content": f"Contexto para tu respuesta: {contexto_adicional}"})
             conversation_history.append({"role": "user", "content": user_prompt})
             
+            # --- CAMBIO CLAVE: VOLVEMOS A GEMINI ---
             response = litellm.completion(
-                model="gemini/gemini-1.5-flash-latest", # Revertido a Flash para evitar errores de cuota
+                model="gemini/gemini-1.5-flash-latest", # Usamos el modelo Pro para máxima inteligencia
                 messages=list(conversation_history),
-                api_key=os.getenv("GEMINI_API_KEY")
+                api_key=os.getenv("GEMINI_API_KEY") # Le pasamos la API Key
             )
             raw_response = response.choices[0].message.content
             conversation_history.append({"role": "assistant", "content": raw_response})
             return raw_response
         except Exception as e:
-            logging.error(f"Error en el worker al llamar a la API: {e}", exc_info=True)
+            logging.error(f"Error en el worker al llamar a la API de Gemini: {e}", exc_info=True)
             return e
-
+            
     async def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Se ejecuta cuando el usuario presiona Enter."""
         prompt = event.value
-        if not prompt:
-            return
-
-        chat_log = self.query_one(RichLog)
-        chat_log.write(f"[bold green]Tú:[/bold green] {prompt}")
-        chat_log.scroll_end(animate=False)
-        self.query_one(Input).clear()
-
+        if not prompt: return
+        chat_log = self.query_one(RichLog); chat_log.write(f"[bold green]Tú:[/bold green] {prompt}"); chat_log.scroll_end(animate=False); self.query_one(Input).clear()
         self.update_face("pensativa")
-        
         self.get_ai_response(prompt)
 
 
 if __name__ == "__main__":
-    app = NovIA()
+    app = NoviaIA()
     app.run()
