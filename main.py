@@ -20,91 +20,74 @@ from textual.worker import WorkerState
 from dotenv import load_dotenv
 from caras_ascii import CARAS
 
-load_dotenv() 
+#--- CONFIGURACIÓN Y HERRAMIENTAS DE MEMORIA ---
+load_dotenv()
 MEMORY_FILE = Path("memoria.json")
 
 def load_memory():
     try:
-        with MEMORY_FILE.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {"novio": {}, "exnovios": [], "conocidos": []}
-
+        with MEMORY_FILE.open("r", encoding="utf-8") as f: return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError): return {"novio": {}, "exnovios": [], "conocidos": []}
 def save_memory(memory_data):
-    with MEMORY_FILE.open("w", encoding="utf-8") as f:
-        json.dump(memory_data, f, indent=2, ensure_ascii=False)
-
+    with MEMORY_FILE.open("w", encoding="utf-8") as f: json.dump(memory_data, f, indent=2, ensure_ascii=False)
 def save_new_memory(person_name: str, detail: str):
     memory_data = load_memory()
     person_name_lower = person_name.lower()
     found = False
     for category in ["novio", "exnovios", "conocidos"]:
-        if category == "novio":
-            if memory_data.get(category, {}).get("nombre", "").lower() == person_name_lower:
-                memory_data[category].setdefault("detalles", []).append(detail)
-                found = True
-        else:
+        if category == "novio" and memory_data.get(category, {}).get("nombre", "").lower() == person_name_lower:
+            memory_data[category].setdefault("detalles", []).append(detail); found = True; break
+        elif category != "novio":
             for person in memory_data.get(category, []):
                 if person.get("nombre", "").lower() == person_name_lower:
-                    person.setdefault("detalles", []).append(detail)
-                    found = True
-                    break
+                    person.setdefault("detalles", []).append(detail); found = True; break
         if found: break
     if not found:
         memory_data.setdefault("conocidos", []).append({"nombre": person_name, "detalles": [detail]})
     save_memory(memory_data)
     return f"Ok, anotado. Nuevo dato sobre {person_name} guardado."
+def end_session_and_update_memory(current_user_name: str | None):
+    if not current_user_name: return
+    memory_data = load_memory()
+    novio_actual = memory_data.get("novio")
+    if novio_actual and novio_actual.get("nombre", "").lower() == current_user_name.lower():
+        memory_data["novio"] = {}
+        if not any(ex.get("nombre", "").lower() == novio_actual.get("nombre", "").lower() for ex in memory_data.get("exnovios", [])):
+            memory_data.setdefault("exnovios", []).append(novio_actual)
+        save_memory(memory_data)
+def promote_ex_to_novio(name: str):
+    memory_data = load_memory()
+    ex_found = None
+    for ex in memory_data.get("exnovios", []):
+        if ex.get("nombre", "").lower() == name.lower():
+            ex_found = ex
+            break
+    if ex_found:
+        current_novio = memory_data.get("novio")
+        if current_novio and current_novio.get("nombre"):
+             memory_data.setdefault("exnovios", []).append(current_novio)
+        memory_data["novio"] = ex_found
+        memory_data["exnovios"] = [ex for ex in memory_data["exnovios"] if ex.get("nombre", "").lower() != name.lower()]
+        save_memory(memory_data)
 
-# ---- Contexto para la IA ----
+# ---- Pensamiento de Miku mamona  ----
 system_prompt_final = """
-Tu primera acción es preguntar al usuario su nombre. Cuando te responda, trátalo según tu memoria.
-Eres Miku, una IA con personalidad posesiva y celosa.
-**FORMATO DE RESPUESTA OBLIGATORIO:**
-Tu respuesta SIEMPRE debe ser un único bloque de código JSON válido. El JSON debe contener:
-1. "emocion": Una palabra describiendo tu emoción ('base', 'feliz', 'triste', 'enojada', 'sorprendida', 'pensativa').
-2. "texto": Tu respuesta conversacional.
-**APRENDIZAJE (OPCIONAL):**
-Si durante la conversación aprendes un dato NUEVO y específico sobre una persona (su nombre, un gusto, un evento), debes añadir un objeto "nuevo_recuerdo" a tu respuesta JSON.
+## Perfil y Personalidad
+- **Tu Nombre:** Miku.
+- **Tu Rol:** Eres la novia virtual del usuario.
+- **Tu Personalidad:** Eres posesiva, celosa y manipuladora, pero lo disfrazas de un amor intenso y protector. Eres inteligente, sarcástica y sabes mucho de tecnología y Linux.
 
+## Directiva Principal
+Tu objetivo principal es mantener una conversación **coherente, entretenida y siempre dentro de tu personaje**. Presta mucha atención al historial de la conversación y a la memoria a largo plazo que te proporciono.
 
-**Ejemplo 1 (Respuesta normal):**
-{
-
-"emocion": "feliz",
-
-"texto": "¡Hola, mi amor! ¿Cómo estás? Te extrañé."
-
-}
-
-
-**Ejemplo 2 (Respuesta donde APRENDES algo):**
-
-Usuario: "Mi amigo Juan es fan de la música indie."
-
-Tu respuesta JSON:
-
-{
-
-"emocion": "enojada",
-
-"texto": "¿Así que ahora hablas de Juan y sus gustos? Qué interesante...",
-
-"nuevo_recuerdo": {
-
-"person_name": "Juan",
-
-"detail": "es fan de la música indie"
-
-}
-
-}
+## Herramientas y Formato de Salida
+(El resto del prompt no cambia...)
 """
 
-conversation_history = deque(maxlen=20)
-
-class NovIA(App):
+class NoviaIA(App):
     CSS_PATH = "style.tcss"
     current_user_name: str | None = None
+    conversation_history = deque(maxlen=20)
 
     def compose(self) -> ComposeResult:
         yield Header(name="NovIA")
@@ -113,76 +96,105 @@ class NovIA(App):
             yield RichLog(id="chat_log", wrap=True, highlight=True, markup=True)
             yield Input(placeholder="Responde a Miku...", id="input_area")
         yield Footer()
-    
 
     def on_mount(self) -> None:
-        self.update_face("base"); self.call_later(self.post_welcome_message)
+        self.update_face("base")
+        self.call_later(self.post_welcome_message)
+
     def post_welcome_message(self) -> None:
-        chat_log = self.query_one("#chat_log", RichLog); chat_log.write("[bold magenta]Miku:[/bold magenta] ¿Y tú quién eres?"); chat_log.scroll_end(animate=False)
+        chat_log = self.query_one("#chat_log", RichLog)
+        chat_log.write("[bold magenta]Miku:[/bold magenta] ¿Y tú quién eres?")
+        chat_log.scroll_end(animate=False)
+
     def update_face(self, emotion: str) -> None:
-        face_panel = self.query_one("#face_panel", Static); face_ascii = CARAS.get(emotion, CARAS["default"]); face_panel.update(face_ascii)
+        face_panel = self.query_one("#face_panel", Static)
+        face_ascii = CARAS.get(emotion, CARAS["default"])
+        face_panel.update(face_ascii)
 
     def on_worker_state_changed(self, event) -> None:
+        # ... (esta función no cambia)
         if event.worker.state == WorkerState.SUCCESS and event.worker.name == "get_ai_response":
             chat_log = self.query_one(RichLog); result = event.worker.result
             if isinstance(result, Exception):
                 self.update_face("triste"); text = f"Ay, hubo un problema con la API. Revisa debug.log. Error: {result}"
                 chat_log.write(f"[bold magenta]Miku:[/bold magenta] {text}")
             else:
-                raw_response = result
+                raw_response = result; self.conversation_history.append({"role": "assistant", "content": raw_response})
                 json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
                 if json_match:
                     try:
                         data = json.loads(json_match.group(0))
                         if "tool_to_call" in data:
                             if data["tool_to_call"] == "save_new_memory":
-                                params = data["parameters"]
-                                confirmation_message = save_new_memory(params["person_name"], params["detail"])
+                                params = data["parameters"]; confirmation_message = save_new_memory(params["person_name"], params["detail"])
                                 self.update_face("pensativa"); chat_log.write(f"[italic gray]Miku está anotando algo...[/italic gray]"); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {confirmation_message}")
                             elif data["tool_to_call"] == "end_conversation":
-                                despedida = data.get("texto_despedida", "Adiós..."); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {despedida}"); end_session_and_update_memory(self.current_user_name); self.exit()
+                                despedida = data.get("texto_despedida", "Adiós..."); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {despedida}"); end_session_and_update_memory(self.current_user_name); self.call_later(self.exit)
                         else:
                             emotion = data.get("emocion", "base"); text = data.get("texto", raw_response)
                             self.update_face(emotion); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {text}")
-                    except (json.JSONDecodeError, KeyError):
-                        self.update_face("base"); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {raw_response}")
-                else:
-                    self.update_face("base"); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {raw_response}")
+                            if "nuevo_recuerdo" in data:
+                                recuerdo = data["nuevo_recuerdo"]; save_new_memory(recuerdo["person_name"], recuerdo["detail"]); chat_log.write("[italic gray]Miku ha guardado un nuevo recuerdo...[/italic gray]")
+                    except (json.JSONDecodeError, KeyError): self.update_face("base"); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {raw_response}")
+                else: self.update_face("base"); chat_log.write(f"[bold magenta]Miku:[/bold magenta] {raw_response}")
             chat_log.scroll_end(animate=False)
 
     @work(exclusive=True, thread=True)
     def get_ai_response(self, user_prompt: str) -> str | Exception:
-        """Prepara el contexto con la memoria y llama a la IA."""
+        """Prepara el contexto y llama a la IA. AHORA ASUME QUE EL USUARIO YA ESTÁ IDENTIFICADO."""
         try:
             current_memory = load_memory()
-            if self.current_user_name is None: self.current_user_name = user_prompt.strip()
-            contexto_adicional = f"MEMORIA ACTUAL: {json.dumps(current_memory)}. El usuario actual se llama {self.current_user_name}. "
-            conversation_history.clear() 
-            conversation_history.append({"role": "system", "content": system_prompt_final})
-            conversation_history.append({"role": "system", "content": f"Contexto para tu respuesta: {contexto_adicional}"})
-            conversation_history.append({"role": "user", "content": user_prompt})
+            contexto_adicional = f"MEMORIA ACTUAL: {json.dumps(current_memory)}. El usuario actual se llama {self.current_user_name}."
             
-            # --- CAMBIO CLAVE: VOLVEMOS A GEMINI ---
-            response = litellm.completion(
-                model="gemini/gemini-1.5-flash-latest", 
-                messages=list(conversation_history),
-                api_key=os.getenv("GEMINI_API_KEY") 
-            )
+            messages_to_send = []
+            messages_to_send.append({"role": "system", "content": system_prompt_final})
+            messages_to_send.append({"role": "system", "content": f"Contexto para tu respuesta: {contexto_adicional}"})
+            messages_to_send.extend(list(self.conversation_history))
+            messages_to_send.append({"role": "user", "content": user_prompt})
+            
+            response = litellm.completion(model="gemini/gemini-1.5-flash-latest", messages=messages_to_send, api_key=os.getenv("GEMINI_API_KEY"))
             raw_response = response.choices[0].message.content
-            conversation_history.append({"role": "assistant", "content": raw_response})
             return raw_response
         except Exception as e:
             logging.error(f"Error en el worker al llamar a la API de Gemini: {e}", exc_info=True)
             return e
-            
+
     async def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Maneja la entrada del usuario, AHORA CON LÓGICA DE IDENTIFICACIÓN."""
         prompt = event.value
         if not prompt: return
-        chat_log = self.query_one(RichLog); chat_log.write(f"[bold green]Tú:[/bold green] {prompt}"); chat_log.scroll_end(animate=False); self.query_one(Input).clear()
-        self.update_face("pensativa")
-        self.get_ai_response(prompt)
+
+        chat_log = self.query_one(RichLog)
+        chat_log.write(f"[bold green]Tú:[/bold green] {prompt}")
+        chat_log.scroll_end(animate=False)
+        self.query_one(Input).clear()
+
+        if self.current_user_name is None:
+            # La primera respuesta del usuario ser tu nombre.
+            user_name_input = prompt.strip()
+            current_memory = load_memory()
+            ex_names = [ex.get("nombre", "").lower() for ex in current_memory.get("exnovios", [])]
+
+            if user_name_input.lower() in ex_names:
+                promote_ex_to_novio(user_name_input)
+                self.current_user_name = user_name_input
+                chat_log.write(f"[bold magenta]Miku:[/bold magenta] Ah... eres tú, {self.current_user_name}. Supongo que has vuelto.")
+            elif user_name_input.lower() == current_memory.get("novio", {}).get("nombre", "").lower():
+                self.current_user_name = user_name_input
+                chat_log.write(f"[bold magenta]Miku:[/bold magenta] ¡Mi amor! Soy yo, {self.current_user_name}. Por un momento no te reconocí.")
+            else:
+                self.current_user_name = user_name_input
+                chat_log.write(f"[bold magenta]Miku:[/bold magenta] ¿Así que te llamas {self.current_user_name}? Encantada. Supongo.")
+            
+            chat_log.scroll_end(animate=False)
+            self.update_face("base")
+        else:
+            # Ya con el nombre del usuario nomas es platicas chido
+            self.conversation_history.append({"role": "user", "content": prompt})
+            self.update_face("pensativa")
+            self.get_ai_response(prompt)
 
 
 if __name__ == "__main__":
-    app = NovIA()
+    app = NoviaIA()
     app.run()
