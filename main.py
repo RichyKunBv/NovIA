@@ -84,7 +84,7 @@ Tu objetivo principal es mantener una conversación **coherente, entretenida y s
 (El resto del prompt no cambia...)
 """
 
-class NoviaIA(App):
+class NovIA(App):
     CSS_PATH = "style.tcss"
     current_user_name: str | None = None
     conversation_history = deque(maxlen=20)
@@ -196,5 +196,5 @@ class NoviaIA(App):
 
 
 if __name__ == "__main__":
-    app = NoviaIA()
+    app = NovIA()
     app.run()
