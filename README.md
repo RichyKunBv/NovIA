@@ -69,7 +69,7 @@ Una vez configurado, el programa se ejecuta iniciando el script `main.py`.
 
     
 
-<img width="1440" height="900" alt="Captura de pantalla 2025-09-09 a la(s) 11 56 48 p m" src="https://github.com/user-attachments/assets/4ce64384-a7a7-47d1-b0e7-92981fdc9325" />
+<img width="1440" height="900" alt="Captura de pantalla 2025-10-01 a la(s) 8 23 16 p m" src="https://github.com/user-attachments/assets/482135de-dd03-4801-916c-f7659da4f7d3" />
 
 </details>
 
