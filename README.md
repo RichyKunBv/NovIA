@@ -2,7 +2,7 @@
 
 NovIA es un proyecto creativo que trae a la vida a Miku, una compañera IA con personalidad, directamente en tu terminal. Inspirada en la estética de herramientas como `neofetch`, esta aplicación combina una interfaz retro con un modelo de lenguaje moderno para crear una experiencia de chat única e interactiva.
 
-<img width="1440" height="900" alt="Captura de pantalla 2025-08-24 a la(s) 11 27 52 p m" src="https://github.com/user-attachments/assets/b539e078-325a-47c7-b91a-d2438c17f3f6" />
+<img width="1440" height="900" alt="Captura de pantalla 2025-10-01 a la(s) 8 08 46 p m" src="https://github.com/user-attachments/assets/ad5c30f2-f4aa-4114-82c2-58710194e129" />
 
 ---
 
