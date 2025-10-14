@@ -1,5 +1,5 @@
 # caras_ascii.py
-
+# NovIA
 # Creador: RichyKunBv
 
 from rich.text import Text
@@ -204,7 +204,7 @@ CARAS = {
 ⢄⠃⠀⠀⡯⠀⣼⢳⠁⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⠋⢠⠠⠀⠀⠀⠀⠀⢀⠈⡐⠠⠁⡀⠀⠀⠀⠀⠃⢂⠀⡆⠀⢸⣯⣟⣾⣯⣟⡇⢰⡞⡄⠀⠀⠀⡇⠰⠀
     """, justify="center", style="bright_magenta"),
 
-    "celos": Text("""
+    "celosa": Text("""
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣤⣀⣀⠀⠀⣀⡠⠴⠒⠚⠉⠉⠓⠒⠦⣄⣶⠒⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⡷⢬⣉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠠⡌⠻⣧⢻⣧⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
