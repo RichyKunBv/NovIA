@@ -1,6 +1,7 @@
 # main.py
-
+# NovIA
 # Creador: RichyKunBv
+# Licencia: Apache License 2.0
 
 import litellm
 import os
@@ -154,7 +155,7 @@ No dejes morir la converzacion, no pongas cosas como "No tengo nada que decir" o
 ## Formato de Salida OBLIGATORIO
 RESPONDE SOLO CON JSON. Ejemplo:
 {{
-    "emocion": "base|feliz|triste|enojada|celos|sorpresa|pensativa", 
+    "emocion": "base|feliz|triste|enojada|celosa|sorprendida|pensativa", 
     "texto": "tu respuesta aquí",
     "personas_mencionadas": ["nombre1", "nombre2"]
 }}
