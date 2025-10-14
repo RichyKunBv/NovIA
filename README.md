@@ -22,7 +22,7 @@ NovIA es un proyecto creativo que trae a la vida a Miku, una compañera IA con p
 * **Lenguaje:** Python 3.10+
 * **Interfaz:** [Textual](https://github.com/Textualize/textual) y [Rich](https://github.com/Textualize/rich)
 * **Conexión IA:** [LiteLLM](https://github.com/BerriAI/litellm)
-* **Modelo de Lenguaje:** Google Gemini 1.5 Flash
+* **Modelo de Lenguaje:** Google Gemini 2.5 Flash
 * **Gestión de Entorno:** venv
 * **Manejo de API Keys:** python-dotenv
 
