@@ -19,13 +19,15 @@ class Config:
         #Ollama usa la CPU y RAM de tu PC (yo estoy usando un M1 con 8GB RAM y va bien, usa minimo 8GB RAM por si acaso)
     # False = Usa la API de Gemini (requiere conexión y API Key)
         #Tienes que entrar a https://aistudio.google.com/api-keys y crear una API Key gratuita y ponerla en el .env
-    USE_OLLAMA =  False
-    MODEL_OLLAMA = "ollama/llama3.1:8b"
+    USE_OLLAMA = False 
+    MODEL_OLLAMA = "ollama/llama3.1:8b"  # Puedes cambiar a otro modelo que tengas localmente
     MODEL_GEMINI = "gemini/gemini-2.5-flash"
     CONVERSATION_HISTORY_LIMIT = 20
     MEMORY_FILE = Path("memoria.json")
     REQUEST_TIMEOUT = 60
     LITELLM_LOG_LEVEL = 'DEBUG'
+    
+    VERSION = "0.5.2"
     
     @classmethod
     def get_timeout(cls):
@@ -41,7 +43,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 
 # Importaciones de Textual
 from textual.app import App, ComposeResult
-from textual.widgets import Static, RichLog, Input, Header, Footer
+from textual.widgets import Static, RichLog, Input, Header, Footer, Label
 from textual.containers import Container
 from textual import work
 from textual.worker import WorkerState
@@ -169,13 +171,18 @@ class NovIA(App):
     conversation_history = deque(maxlen=Config.CONVERSATION_HISTORY_LIMIT)
 
     def compose(self) -> ComposeResult:
-        """Crea los widgets de la interfaz."""
+        """Crea los widgets con la estructura de contenedores correcta."""
         header_name = "NovIA (Offline)" if Config.USE_OLLAMA else "NovIA (Online)"
+        
         yield Header(name=header_name)
-        yield Static(id="face_panel")
-        with Container(id="chat_panel"):
-            yield RichLog(id="chat_log", wrap=True, highlight=True, markup=True)
-            yield Input(placeholder="Responde a Miku...", id="input_area")
+        
+        with Container(id="main-container"):
+            yield Static(id="face_panel")
+            with Container(id="chat_panel"):
+                yield RichLog(id="chat_log", wrap=True, highlight=True, markup=True)
+                yield Input(placeholder="Responde a Miku...", id="input_area")
+        
+        yield Label(f" v{Config.VERSION}", id="version-label")
         yield Footer()
 
     def on_unmount(self) -> None:
@@ -310,7 +317,7 @@ class NovIA(App):
             chat_log.write(f"[bold magenta]Miku:[/bold magenta] Ah... eres tú, {self.current_user_name}. Supongo que has vuelto.")
         elif user_name_lower == current_novio_name:
             self.current_user_name = user_name_input
-            chat_log.write(f"[bold magenta]Miku:[/bold magenta] ¡Mi amor! Soy yo, {self.current_user_name}. Por un momento no te reconocí.")
+            chat_log.write(f"[bold magenta]Miku:[/bold magenta] ¡Mi amor! por fin te veo {self.current_user_name}.")
         else:
             self.current_user_name = user_name_input
             chat_log.write(f"[bold magenta]Miku:[/bold magenta] ¿Así que te llamas {self.current_user_name}? Encantada. Supongo.")

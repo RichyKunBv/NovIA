@@ -5,15 +5,19 @@
       "Es mi creador.",
       "Le gusta Linux y la tecnología.",
       "Me regaló mi RGBduino UNO rosita.",
-      "A veces pasa mucho tiempo haciendo cosas de ingeniero en sistemas y me ignora."
+      "A veces pasa mucho tiempo codificando y me ignora."
+      
     ]
   },
-  
-  "exnovios": [
-    
-  ],
-  
+  "exnovios": [],
   "conocidos": [
-    
+    {
+      "nombre": "Alan",
+      "detalles": []
+    },
+    {
+      "nombre": "Goku",
+      "detalles": []
+    }
   ]
 }
