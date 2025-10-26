@@ -46,7 +46,7 @@ Sigue estos pasos para poner en marcha el proyecto.
 
 4.  **Configura Ollama (Solo para Modo Offline):**
     * Descarga e instala Ollama desde [ollama.com](https://ollama.com).
-    * Abre tu terminal y descarga el modelo de lenguaje: `ollama run llama3.1:8b`
+    * Abre tu terminal y descarga el modelo de lenguaje: `ollama run phi3.5:3.8b`
 
 ---
 ## 🔌 Cómo Cambiar entre Gemini (Online) y Ollama (Offline)
