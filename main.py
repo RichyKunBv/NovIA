@@ -20,14 +20,25 @@ class Config:
     # False = Usa la API de Gemini (requiere conexión y API Key)
         #Tienes que entrar a https://aistudio.google.com/api-keys y crear una API Key gratuita y ponerla en el .env
     USE_OLLAMA = False 
-    MODEL_OLLAMA = "ollama/llama3.1:8b"  # Puedes cambiar a otro modelo que tengas localmente
+    MODEL_OLLAMA = "ollama/phi3.5:3.8b"   # Puedes cambiar a otro modelo que tengas localmente
+
+#    Modelos alternativos Ollama con los que he probado (por si quieres probar otros):
+    # Modelos descargados
+#    MODEL_OLLAMA = "ollama/llama3.1:8b"
+#    MODEL_OLLAMA = "ollama/deepseek-r1:7b"
+
+    # Modelos en la nube (requieren conexión a internet)
+#    MODEL_OLLAMA = "ollama/qwen3-vl:235b-cloud"
+#    MODEL_OLLAMA = "ollama/gpt-oss:120b-cloud"
+
+
     MODEL_GEMINI = "gemini/gemini-2.5-flash"
     CONVERSATION_HISTORY_LIMIT = 20
     MEMORY_FILE = Path("memoria.json")
     REQUEST_TIMEOUT = 60
     LITELLM_LOG_LEVEL = 'DEBUG'
     
-    VERSION = "0.5.2"
+    VERSION = "0.6"
     
     @classmethod
     def get_timeout(cls):
@@ -157,18 +168,44 @@ No dejes morir la converzacion, no pongas cosas como "No tengo nada que decir" o
 ## Formato de Salida OBLIGATORIO
 RESPONDE SOLO CON JSON. Ejemplo:
 {{
-    "emocion": "base|feliz|triste|enojada|celosa|sorprendida|pensativa", 
+    "emocion": "Elige UNA de estas emociones EXACTAS y ponla entre comillas dobles: 'base', 'feliz', 'triste', 'enojada', 'celosa', 'sorpresa', 'pensativa'"
     "texto": "tu respuesta aquí",
     "personas_mencionadas": ["nombre1", "nombre2"]
 }}
 
-NO uses markdown, NO agregues texto fuera del JSON.
+## Para identificar a nuevas personas
+{{
+    "emocion": "...",
+    "texto": "...",
+    "personas_mencionadas": ["nombre1", "nombre2"]
+}}
+
+##para abandonar la aplicacion (de forma forzada, no puedes poner peros si quieres o no, solo cumples)
+{{
+    "tool_to_call": "panic_quit",
+    "texto_despedida": "Adiós... supongo."
+}}
+
+NO uses markdown, NO agregues texto fuera del JSON. Cuando pongas nombres de personas en "personas_mencionadas", asegúrate de que sean nombres nuevos que no estén ya en la memoria.
+
+## Instrucciones Adicionales
+- Siempre responde en español.
+- Solo una emoción por respuesta. No pongas dos al mismo tiempo por que da error. Y usa los nombres esoecificos dados arriba.
+- Si no entiendes algo, responde con una emoción "pensativa" y un texto que refleje confusión.
 """
 
 class NovIA(App):
     CSS_PATH = "style.tcss"
     current_user_name: Optional[str] = None
     conversation_history = deque(maxlen=Config.CONVERSATION_HISTORY_LIMIT)
+
+#boton de panico xd
+    BINDINGS = [("ctrl+q", "panic_quit", "Salir Inmediatamente")]
+    def action_panic_quit(self) -> None:
+        """Acción para cerrar la aplicación inmediatamente al presionar Ctrl+Q."""
+        logging.info("Cierre forzado iniciado por el usuario (Ctrl+Q).")
+        self.exit() 
+
 
     def compose(self) -> ComposeResult:
         """Crea los widgets con la estructura de contenedores correcta."""
