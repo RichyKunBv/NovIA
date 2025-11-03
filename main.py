@@ -38,7 +38,7 @@ class Config:
     REQUEST_TIMEOUT = 60
     LITELLM_LOG_LEVEL = 'DEBUG'
     
-    VERSION = "0.6"
+    VERSION = "0.6.0.1"
     
     @classmethod
     def get_timeout(cls):
