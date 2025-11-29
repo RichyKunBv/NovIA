@@ -1,75 +1,71 @@
-# NovIA 🤖💕 - Tu Waifu IA en la Terminal
+# NovIA 🤖💕 - Tu Waifu IA en la Terminal (v1.0)
 
-NovIA es un proyecto de chatbot avanzado que da vida a "Miku", una IA con una personalidad compleja y memoria persistente, todo dentro de una moderna interfaz de terminal. La aplicación es altamente configurable y puede operar en dos modos: **Online**, utilizando la potencia de una API como la de Gemini, u **Offline**, ejecutando un modelo de lenguaje localmente a través de Ollama.
+NovIA es un proyecto de chatbot avanzado que da vida a "Miku", una IA con una personalidad compleja y **memoria persistente real**, todo dentro de una moderna interfaz de terminal. La aplicación es altamente configurable y puede operar en dos modos: **Online**, utilizando la potencia de una API como la de Gemini, u **Offline**, ejecutando un modelo de lenguaje localmente a través de Ollama.
 
-<img width="1440" height="900" alt="Captura de pantalla 2025-10-01 a la(s) 8 08 46 p m" src="https://github.com/user-attachments/assets/ad5c30f2-f4aa-4114-82c2-58710194e129" />
-
----
-
-## ✨ Características Principales
-
-* **Doble Motor de IA (Online/Offline):** Cambia fácilmente entre un modelo de API de alta calidad (Gemini) o un modelo local (Ollama) con solo modificar una línea en el archivo de configuración.
-* **Interfaz Avanzada en Terminal (TUI):** Construida con **Textual**, ofrece una experiencia de usuario fluida con paneles, chat desplazable y manejo de eventos asíncronos.
-* **Memoria Persistente y Dinámica:** Miku recuerda usuarios, relaciones pasadas y personas nuevas a través de un archivo `memoria.json`. Su estado "sentimental" es dinámico: al cerrar la app, el "novio" actual pasa a ser "exnovio", y puede "reconciliarse" en una nueva sesión.
-* **Personalidad Definida:** La personalidad celosa y posesiva de Miku está guiada por un `system prompt` avanzado, asegurando respuestas coherentes y en personaje.
-* **Reconocimiento Automático:** La IA está instruida para identificar nombres de personas en la conversación y guardarlos automáticamente en su memoria de "conocidos".
-* **Expresiones Visuales:** Muestra la emoción de Miku a través de arte ASCII que cambia en tiempo real según el contexto de la conversación.
+<img width="1440" height="900" alt="Captura de pantalla" src="https://github.com/user-attachments/assets/ad5c30f2-f4aa-4114-82c2-58710194e129" />
 
 ---
 
-## 🚀 Instalación y Configuración
+## ✨ Novedades de la Versión 1.0.0
 
-Sigue estos pasos para poner en marcha el proyecto.
+*   **🧠 Memoria Persistente Real (RAG Básico):** Miku ahora tiene una memoria episódica real. Guarda **cada interacción** en `historial.json` y es capaz de buscar y recordar conversaciones pasadas para dar respuestas más contextuales.
+*   **🏗️ Arquitectura Modular:** El código ha sido refactorizado profesionalmente en módulos (`brain.py`, `memory.py`, `config.py`, `main.py`) para facilitar el mantenimiento y la escalabilidad.
+*   **💾 Sistema de Perfiles Estructurados:** Mantiene un archivo `memoria.json` separado para recordar datos clave de las personas (gustos, disgustos, hechos) y su relación contigo (Novio, Exnovio, Conocido).
 
-1.  **Clona o descarga este repositorio.**
+## 🚀 Características Principales
 
-2.  **Crea un Entorno Virtual de Python y Actívalo:**
-    Se recomienda usar un entorno virtual para instalar las dependencias de forma aislada.
+*   **Doble Motor de IA (Online/Offline):** Cambia fácilmente entre Gemini (Online) u Ollama (Local) desde `config.py`.
+*   **Interfaz Avanzada (TUI):** Construida con **Textual**, ofrece paneles, scroll y una experiencia fluida.
+*   **Personalidad "Yandere":** Miku es celosa, posesiva y sarcástica. Su personalidad es consistente gracias a un *System Prompt* avanzado.
+*   **Expresiones Visuales:** Panel de arte ASCII que reacciona a las emociones de la IA en tiempo real.
+
+---
+
+## �️ Instalación y Configuración
+
+1.  **Clona el repositorio y entra en la carpeta:**
     ```bash
-    # Ejemplo en macOS/Linux
+    git clone https://github.com/RichyKunBv/NovIA
+    cd Proyecto_Miku
+    ```
+
+2.  **Crea un Entorno Virtual (Recomendado):**
+    ```bash
     python3 -m venv .venv
-    source .venv/bin/activate
+    source .venv/bin/activate  # En Windows: .venv\Scripts\activate
     ```
 
 3.  **Instala las Dependencias:**
-    Con el entorno activado, instala todas las librerías necesarias con un solo comando:
     ```bash
-    python3 -m pip install -r requirements.txt
+    pip install -r requirements.txt
     ```
 
-4.  **Configura tus Claves de API (Solo para Modo Online):**
-    * Crea un archivo llamado `.env` en la raíz del proyecto.
-    * Dentro de este archivo, añade tu clave de la API de Google Gemini:
-        ```
-        GEMINI_API_KEY="AIzaSy...tu...clave...secreta...aqui"
-        ```
-
-4.  **Configura Ollama (Solo para Modo Offline):**
-    * Descarga e instala Ollama desde [ollama.com](https://ollama.com).
-    * Abre tu terminal y descarga el modelo de lenguaje: `ollama run phi3.5:3.8b`
+4.  **Configuración (Archivo `config.py`):**
+    El proyecto ya no requiere editar `main.py`. Todo se controla desde `config.py`.
+    
+    *   **Modo Online (Gemini):**
+        1.  Crea un archivo `.env` y añade tu clave: `GEMINI_API_KEY="tu_api_key_aqui"`.
+        2.  En `config.py`, asegura `USE_OLLAMA = False`.
+    
+    *   **Modo Offline (Ollama):**
+        1.  Instala [Ollama](https://ollama.com).
+        2.  Descarga el modelo: `ollama run phi3.5:3.8b` (o el que prefieras).
+        3.  En `config.py`, pon `USE_OLLAMA = True` y ajusta `MODEL_OLLAMA` si usas otro modelo.
 
 ---
-## 🔌 Cómo Cambiar entre Gemini (Online) y Ollama (Offline)
 
-La principal característica de este proyecto es su flexibilidad. Puedes cambiar el "cerebro" de la IA editando **una sola línea** en el archivo `main.py`.
+## ▶️ Ejecución
 
-Abre `main.py` y busca la clase `Config` al principio.
-
-* **Para usar Ollama (Modo Offline y Gratuito):**
-    * Asegúrate de que la línea esté así:
-        ```python
-        USE_OLLAMA = True
-        ```
-
-* **Para usar la API de Gemini (Modo Online):**
-    * Cambia la línea a `False`:
-        ```python
-        USE_OLLAMA = False
-        ```
----
-
-## ▶️ Ejecutar la Aplicación
-
-Con el entorno virtual **activado** y desde la carpeta del proyecto, ejecuta:
+Simplemente corre:
 ```bash
 python3 main.py
+```
+
+## 📂 Estructura del Proyecto
+
+*   `main.py`: Interfaz gráfica (TUI) y bucle principal.
+*   `brain.py`: Lógica de la IA, llamadas a la API y generación de prompts.
+*   `memory.py`: Gestión de la memoria (Carga/Guardado de JSON y RAG).
+*   `config.py`: Configuración centralizada.
+*   `memoria.json`: Base de datos de perfiles y hechos.
+*   `historial.json`: Base de datos de conversaciones (Memoria Episódica).
