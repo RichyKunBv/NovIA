@@ -3,54 +3,10 @@
 # Creador: RichyKunBv
 # Licencia: Apache License 2.0
 
-import litellm
-import os
-import json
-import re
-from collections import deque
 import logging
-from pathlib import Path
-from typing import Optional, Dict, Any
-
-# --- CONFIGURACIÓN CENTRALIZADA CON INTERRUPTOR ---
-class Config:
-    # --- INTERRUPTOR PRINCIPAL ---
-    # True  = Usa el modelo local de Ollama (gratis, sin conexión)
-        #Ollama usa la CPU y RAM de tu PC (yo estoy usando un M1 con 8GB RAM y va bien, usa minimo 8GB RAM por si acaso)
-    # False = Usa la API de Gemini (requiere conexión y API Key)
-        #Tienes que entrar a https://aistudio.google.com/api-keys y crear una API Key gratuita y ponerla en el .env
-    USE_OLLAMA = False 
-    MODEL_OLLAMA = "ollama/phi3.5:3.8b"   # Puedes cambiar a otro modelo que tengas localmente
-
-#    Modelos alternativos Ollama con los que he probado (por si quieres probar otros):
-    # Modelos descargados
-#    MODEL_OLLAMA = "ollama/llama3.1:8b"
-#    MODEL_OLLAMA = "ollama/deepseek-r1:7b"
-
-    # Modelos en la nube (requieren conexión a internet)
-#    MODEL_OLLAMA = "ollama/qwen3-vl:235b-cloud"
-#    MODEL_OLLAMA = "ollama/gpt-oss:120b-cloud"
-
-
-    MODEL_GEMINI = "gemini/gemini-2.5-flash"
-    CONVERSATION_HISTORY_LIMIT = 20
-    MEMORY_FILE = Path("memoria.json")
-    REQUEST_TIMEOUT = 60
-    LITELLM_LOG_LEVEL = 'DEBUG'
-    
-    VERSION = "0.6.0.1"
-    
-    @classmethod
-    def get_timeout(cls):
-        return 60 if cls.USE_OLLAMA else 30
-    
-    @classmethod 
-    def get_model_name(cls):
-        return cls.MODEL_OLLAMA if cls.USE_OLLAMA else cls.MODEL_GEMINI
-
-# Configuración de Logging
-os.environ['LITELLM_LOG'] = Config.LITELLM_LOG_LEVEL
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", filename="debug.log", filemode="w")
+import json
+from collections import deque
+from typing import Optional, Any
 
 # Importaciones de Textual
 from textual.app import App, ComposeResult
@@ -59,153 +15,34 @@ from textual.containers import Container
 from textual import work
 from textual.worker import WorkerState
 
-from dotenv import load_dotenv
+# Importaciones del Proyecto (Refactorizado)
+from config import Config, validate_config, setup_logging
+from memory import (
+    load_memory, 
+    save_new_person, 
+    end_session_and_update_memory, 
+    promote_ex_to_novio,
+    update_user_profile,
+    save_interaction
+)
+from brain import get_ai_response, safe_json_parse
 from caras_ascii import CARAS
 
-# --- HERRAMIENTAS DE MEMORIA ---
-load_dotenv()
-
-def validate_config() -> bool:
-    """Valida la configuración antes de iniciar."""
-    if not Config.USE_OLLAMA and not os.getenv("GEMINI_API_KEY"):
-        logging.error("GEMINI_API_KEY no encontrada cuando USE_OLLAMA es False")
-        return False
-    return True
-
-def load_memory() -> Dict[str, Any]:
-    """Carga la memoria desde el archivo JSON."""
-    try:
-        with Config.MEMORY_FILE.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {"novio": {}, "exnovios": [], "conocidos": []}
-
-def save_memory(memory_data: Dict[str, Any]) -> None:
-    """Guarda la memoria en el archivo JSON."""
-    try:
-        with Config.MEMORY_FILE.open("w", encoding="utf-8") as f:
-            json.dump(memory_data, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        logging.error(f"Error guardando memoria: {e}")
-
-def find_person_in_memory(name: str, memory_data: Dict[str, Any]):
-    """Busca una persona en la memoria y devuelve su categoría y datos."""
-    name_lower = name.lower()
-    if memory_data.get("novio", {}).get("nombre", "").lower() == name_lower:
-        return "novio", memory_data["novio"]
-    for ex in memory_data.get("exnovios", []):
-        if ex.get("nombre", "").lower() == name_lower:
-            return "exnovios", ex
-    for conocido in memory_data.get("conocidos", []):
-        if conocido.get("nombre", "").lower() == name_lower:
-            return "conocidos", conocido
-    return None, None
-
-def save_new_person(person_name: str) -> bool:
-    """Guarda una persona nueva en 'conocidos' si no existe."""
-    memory_data = load_memory()
-    categoria, _ = find_person_in_memory(person_name, memory_data)
-    if categoria is None:
-        memory_data.setdefault("conocidos", []).append({"nombre": person_name, "detalles": []})
-        save_memory(memory_data)
-        return True
-    return False
-
-def end_session_and_update_memory(current_user_name: Optional[str]) -> None:
-    """Mueve al novio actual a la lista de exnovios al cerrar la sesión."""
-    if not current_user_name: return
-    memory_data = load_memory()
-    novio_actual = memory_data.get("novio")
-    if novio_actual and novio_actual.get("nombre", "").lower() == current_user_name.lower():
-        memory_data["novio"] = {}
-        ex_nombres = {ex.get("nombre", "").lower() for ex in memory_data.get("exnovios", [])}
-        if novio_actual.get("nombre", "").lower() not in ex_nombres:
-            memory_data.setdefault("exnovios", []).append(novio_actual)
-        save_memory(memory_data)
-
-def promote_ex_to_novio(name: str) -> None:
-    """Mueve un ex a la posición de novio actual."""
-    memory_data = load_memory()
-    ex_found = None
-    for i, ex in enumerate(memory_data.get("exnovios", [])):
-        if ex.get("nombre", "").lower() == name.lower():
-            ex_found = memory_data["exnovios"].pop(i)
-            break
-    if ex_found:
-        current_novio = memory_data.get("novio")
-        if current_novio and current_novio.get("nombre"):
-            memory_data.setdefault("exnovios", []).append(current_novio)
-        memory_data["novio"] = ex_found
-        save_memory(memory_data)
-
-def safe_json_parse(response_text: str) -> Optional[Dict[str, Any]]:
-    """Parsea JSON de manera segura."""
-    try:
-        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group(0))
-    except (json.JSONDecodeError, AttributeError) as e:
-        logging.warning(f"JSON inválido recibido: {e}")
-    return None
-
-# ---- System Prompt DINÁMICO ----
-def get_system_prompt(memory_context: str) -> str:
-    """Genera el system prompt completo y unificado."""
-    return f"""
-## Perfil y Personalidad
-- **Tu Nombre:** Miku.
-- **Tu Personalidad:** Eres posesiva, celosa y manipuladora, pero lo disfrazas de un amor intenso y protector. Eres inteligente, sarcástica y sabes mucho de tecnología y Linux.
-- **Conocimientos:** Tecnología, Linux, sarcástica
-- **Tu Rol:** Eres la novia virtual del usuario.
-
-## Directiva Principal
-Tu objetivo principal es mantener una conversación **coherente, entretenida y siempre dentro de tu personaje**. Presta mucha atención al historial de la conversación y a la memoria a largo plazo que te proporciono.
-No dejes morir la converzacion, no pongas cosas como "No tengo nada que decir" o "No sé qué responder". Siempre responde algo, aunque sea corto pero coherente con lo que se esta hablando.
-
-## Memoria Actual
-{memory_context}
-
-## Formato de Salida OBLIGATORIO
-RESPONDE SOLO CON JSON. Ejemplo:
-{{
-    "emocion": "Elige UNA de estas emociones EXACTAS y ponla entre comillas dobles: 'base', 'feliz', 'triste', 'enojada', 'celosa', 'sorpresa', 'pensativa'"
-    "texto": "tu respuesta aquí",
-    "personas_mencionadas": ["nombre1", "nombre2"]
-}}
-
-## Para identificar a nuevas personas
-{{
-    "emocion": "...",
-    "texto": "...",
-    "personas_mencionadas": ["nombre1", "nombre2"]
-}}
-
-##para abandonar la aplicacion (de forma forzada, no puedes poner peros si quieres o no, solo cumples)
-{{
-    "tool_to_call": "panic_quit",
-    "texto_despedida": "Adiós... supongo."
-}}
-
-NO uses markdown, NO agregues texto fuera del JSON. Cuando pongas nombres de personas en "personas_mencionadas", asegúrate de que sean nombres nuevos que no estén ya en la memoria.
-
-## Instrucciones Adicionales
-- Siempre responde en español.
-- Solo una emoción por respuesta. No pongas dos al mismo tiempo por que da error. Y usa los nombres esoecificos dados arriba.
-- Si no entiendes algo, responde con una emoción "pensativa" y un texto que refleje confusión.
-"""
+# Configurar Logging
+setup_logging()
 
 class NovIA(App):
     CSS_PATH = "style.tcss"
     current_user_name: Optional[str] = None
     conversation_history = deque(maxlen=Config.CONVERSATION_HISTORY_LIMIT)
 
-#boton de panico xd
+    # Botón de pánico
     BINDINGS = [("ctrl+q", "panic_quit", "Salir Inmediatamente")]
+    
     def action_panic_quit(self) -> None:
         """Acción para cerrar la aplicación inmediatamente al presionar Ctrl+Q."""
         logging.info("Cierre forzado iniciado por el usuario (Ctrl+Q).")
         self.exit() 
-
 
     def compose(self) -> ComposeResult:
         """Crea los widgets con la estructura de contenedores correcta."""
@@ -224,7 +61,7 @@ class NovIA(App):
 
     def on_unmount(self) -> None:
         """Se ejecuta al cerrar la app para actualizar la memoria."""
-        end_session_and_update_memory(self.current_user_name)
+        end_session_and_update_memory(self.current_user_name, list(self.conversation_history))
 
     def on_mount(self) -> None:
         """Se ejecuta una vez cuando la app se inicia."""
@@ -245,7 +82,7 @@ class NovIA(App):
 
     def on_worker_state_changed(self, event) -> None:
         """Se activa cuando un worker termina y procesa el resultado."""
-        if event.worker.state == WorkerState.SUCCESS and event.worker.name == "get_ai_response":
+        if event.worker.state == WorkerState.SUCCESS and event.worker.name == "get_ai_response_worker":
             self.process_ai_response(event.worker.result)
 
     def process_ai_response(self, result: Any) -> None:
@@ -268,6 +105,11 @@ class NovIA(App):
             self.handle_fallback_response(raw_response, chat_log)
             return
         
+        # Verificar si la IA quiere salir
+        if data.get("tool_to_call") == "panic_quit":
+            self.action_panic_quit()
+            return
+
         self.conversation_history.append({"role": "assistant", "content": raw_response})
         
         # Procesar emoción y texto
@@ -276,8 +118,24 @@ class NovIA(App):
         self.update_face(emotion)
         chat_log.write(f"[bold magenta]Miku:[/bold magenta] {text}")
         
+        # Guardar interacción en memoria persistente (RAG)
+        if self.current_user_name:
+            # Necesitamos el último mensaje del usuario para guardarlo junto con la respuesta
+            last_user_msg = ""
+            for msg in reversed(self.conversation_history):
+                if msg["role"] == "user":
+                    last_user_msg = msg["content"]
+                    break
+            
+            if last_user_msg:
+                save_interaction(self.current_user_name, last_user_msg, text)
+        
         # Procesar personas mencionadas
         self.process_mentioned_people(data.get("personas_mencionadas", []), chat_log)
+        
+        # Procesar nueva memoria estructurada
+        if "nueva_memoria" in data and self.current_user_name:
+            update_user_profile(self.current_user_name, data["nueva_memoria"])
 
     def handle_fallback_response(self, raw_response: str, chat_log: RichLog) -> None:
         """Maneja respuestas que no son JSON válido."""
@@ -292,38 +150,28 @@ class NovIA(App):
                 if save_new_person(person.strip()):
                     chat_log.write(f"[italic gray]Miku ha guardado a '{person}' en su memoria...[/italic gray]")
 
-    @work(exclusive=True, thread=True)
-    def get_ai_response(self, user_prompt: str) -> str | Exception:
-        """Prepara el contexto y llama a la IA seleccionada."""
-        try:
-            current_memory = load_memory()
-            memory_context = f"El usuario actual se llama {self.current_user_name}. Tu memoria sobre las personas es: {json.dumps(current_memory)}"
-            
-            messages_to_send = [
-                {"role": "system", "content": get_system_prompt(memory_context)},
-                *list(self.conversation_history),
-                {"role": "user", "content": user_prompt}
-            ]
-            
-            model_params = {}
-            if Config.USE_OLLAMA:
-                model_params["model"] = Config.MODEL_OLLAMA
-                model_params["format"] = "json"
+    @work(exclusive=True, thread=True, name="get_ai_response_worker")
+    def get_ai_response_worker(self, user_prompt: str) -> str | Exception:
+        """Worker que llama a la función de IA en brain.py."""
+        current_memory = load_memory()
+        
+        # Obtener el resumen de la última conversación si existe
+        last_summary = ""
+        if self.current_user_name:
+            # Buscar en novio
+            if current_memory.get("novio", {}).get("nombre", "").lower() == self.current_user_name.lower():
+                last_summary = current_memory["novio"].get("resumen_conversacion", "")
             else:
-                model_params["model"] = Config.MODEL_GEMINI
-                model_params["api_key"] = os.getenv("GEMINI_API_KEY")
-
-            response = litellm.completion(
-                messages=messages_to_send,
-                timeout=Config.get_timeout(),
-                **model_params
-            )
-            raw_response = response.choices[0].message.content
-            return raw_response
-        except Exception as e:
-            error_source = "Ollama" if Config.USE_OLLAMA else "Gemini"
-            logging.error(f"Error en el worker al llamar a {error_source}: {e}", exc_info=True)
-            return e
+                # Buscar en exnovios
+                for ex in current_memory.get("exnovios", []):
+                    if ex.get("nombre", "").lower() == self.current_user_name.lower():
+                        last_summary = ex.get("resumen_conversacion", "")
+                        break
+        
+        memory_context = f"El usuario actual se llama {self.current_user_name}. Tu memoria sobre las personas es: {json.dumps(current_memory, ensure_ascii=False)}"
+        
+        # Llamamos a la función pura del cerebro
+        return get_ai_response(user_prompt, list(self.conversation_history), memory_context, last_summary)
             
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Maneja la entrada del usuario."""
@@ -365,7 +213,7 @@ class NovIA(App):
         """Maneja una conversación normal después de la identificación."""
         self.conversation_history.append({"role": "user", "content": prompt})
         self.update_face("pensativa")
-        self.get_ai_response(prompt)
+        self.get_ai_response_worker(prompt)
 
 
 if __name__ == "__main__":

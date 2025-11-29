@@ -1,23 +1,43 @@
 {
-  "novio": {
-    "nombre": "Ricardo",
-    "detalles": [
-      "Es mi creador.",
-      "Le gusta Linux y la tecnología.",
-      "Me regaló mi RGBduino UNO rosita.",
-      "A veces pasa mucho tiempo codificando y me ignora."
-      
-    ]
-  },
-  "exnovios": [],
+  "novio": {},
+  "exnovios": [
+    {
+      "nombre": "Ricardo",
+      "detalles": [],
+      "perfil": {
+        "gustos": [
+          "Linux",
+          "Tecnología"
+        ],
+        "disgustos": [],
+        "hechos": [
+          "Es mi creador.",
+          "Me regaló mi RGBduino UNO rosita.",
+          "A veces pasa mucho tiempo haciendo cosas de ingeniero y me ignora.",
+          "Ricardo sabe que puede 'perfeccionarme' y mejorar mis capacidades con sus 'truquitos nuevos', incluida la memoria."
+        ]
+      },
+      "resumen_conversacion": ""
+    }
+  ],
   "conocidos": [
     {
       "nombre": "Alan",
-      "detalles": []
+      "detalles": [],
+      "perfil": {
+        "gustos": [],
+        "disgustos": [],
+        "hechos": []
+      }
     },
     {
       "nombre": "Goku",
-      "detalles": []
+      "detalles": [],
+      "perfil": {
+        "gustos": [],
+        "disgustos": [],
+        "hechos": []
+      }
     }
   ]
 }
